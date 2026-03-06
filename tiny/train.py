@@ -208,6 +208,10 @@ class CausalSelfAttention(nn.Module):
         # Per-head attention gate: enables context-based attention no-op
         self.attn_gate_channels = 12
         self.attn_gate = nn.Linear(self.attn_gate_channels, self.n_head, bias=False)
+        # Determine if this is a long-window layer for partial key offset
+        pattern = config.window_pattern.upper()
+        char = pattern[layer_idx % len(pattern)]
+        self.use_key_offset = (char == 'L') or (layer_idx == config.n_layer - 1)
 
     def forward(self, x, ve, cos_sin, window_size):
         B, T, C = x.size()
@@ -222,6 +226,9 @@ class CausalSelfAttention(nn.Module):
         cos, sin = cos_sin
         q, k = apply_rotary_emb(q, cos, sin), apply_rotary_emb(k, cos, sin)
         q, k = norm(q), norm(k)
+        # Partial key offset: shift stationary dims forward by 1 on long-window layers
+        if self.use_key_offset and T > 1:
+            k[:, 1:, :, self.head_dim // 2:] = k[:, :-1, :, self.head_dim // 2:].clone()
         y = flash_attn.flash_attn_func(q, k, v, causal=True, window_size=window_size)
         # Per-head attention gate (sparse gated attention, zero-init → sigmoid(0)=0.5 at start)
         y = y * torch.sigmoid(self.attn_gate(x[..., :self.attn_gate_channels])).unsqueeze(-1)
@@ -293,7 +300,7 @@ class GPT(nn.Module):
             torch.nn.init.uniform_(block.mlp.c_fc.weight, -s, s)
             torch.nn.init.zeros_(block.mlp.c_proj.weight)
 
-        self.resid_lambdas.fill_(1.0)
+        self.resid_lambdas.fill_(1.1)
         self.x0_lambdas.fill_(0.1)
         for proj in self.ve_projs.values():
             torch.nn.init.uniform_(proj.weight, -s, s)  
@@ -310,7 +317,11 @@ class GPT(nn.Module):
 
     def _precompute_rotary(self, seq_len, head_dim, base=10000):
         device = self.transformer.wte.weight.device
-        inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32, device=device) / head_dim))
+        # Half-truncated RoPE: only rotate half the dims, leave the rest stationary
+        half = head_dim // 4  # number of frequency pairs for the rotated half
+        inv_freq = 1.0 / (base ** (torch.arange(0, half * 2, 2, dtype=torch.float32, device=device) / (half * 2)))
+        # Pad with zeros for the stationary half
+        inv_freq = torch.cat([inv_freq, torch.zeros(head_dim // 2 - half, dtype=torch.float32, device=device)])
         t = torch.arange(seq_len, dtype=torch.float32, device=device)
         freqs = torch.outer(t, inv_freq)
         cos, sin = freqs.cos().bfloat16(), freqs.sin().bfloat16()
