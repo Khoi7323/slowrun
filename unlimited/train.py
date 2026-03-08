@@ -738,6 +738,53 @@ def load_teacher_models(checkpoint_paths, config, device):
 # Training one model
 # =============================================================================
 
+@torch.no_grad()
+def evaluate_distill_val(student, teacher, batches, steps, autocast_ctx, alpha, temperature, device):
+    """Compute val KL loss, combined loss, and teacher CE loss."""
+    total_student_ce = torch.tensor(0.0, dtype=torch.float64, device=device)
+    total_kl        = torch.tensor(0.0, dtype=torch.float64, device=device)
+    total_teacher_ce = torch.tensor(0.0, dtype=torch.float64, device=device)
+    total_tokens    = torch.tensor(0, dtype=torch.int64, device=device)
+
+    batch_iter = iter(batches)
+    for _ in range(steps):
+        x, y, _ = next(batch_iter)
+        with autocast_ctx:
+            student_logits = student.forward_logits(x).float()
+            teacher_logits = teacher.forward_logits(x).float()
+
+        flat_s = student_logits.view(-1, student_logits.size(-1))
+        flat_t = teacher_logits.view(-1, teacher_logits.size(-1))
+        flat_y = y.view(-1)
+        mask = flat_y != -1
+
+        student_ce_sum  = F.cross_entropy(flat_s, flat_y, ignore_index=-1, reduction='sum')
+        teacher_ce_sum  = F.cross_entropy(flat_t, flat_y, ignore_index=-1, reduction='sum')
+        T = temperature
+        kl_sum = F.kl_div(
+            F.log_softmax(flat_s[mask] / T, dim=-1),
+            F.softmax(flat_t[mask] / T, dim=-1),
+            reduction='sum',
+        ) * (T * T)
+
+        total_student_ce  += student_ce_sum.double()
+        total_kl          += kl_sum.double()
+        total_teacher_ce  += teacher_ce_sum.double()
+        total_tokens      += mask.sum()
+
+    if dist.is_initialized():
+        for t in [total_student_ce, total_kl, total_teacher_ce, total_tokens]:
+            dist.all_reduce(t, op=dist.ReduceOp.SUM)
+
+    n = total_tokens.item()
+    if n == 0:
+        return float('inf'), float('inf'), float('inf')
+
+    val_kl         = total_kl.item() / n
+    val_teacher_ce = total_teacher_ce.item() / n
+    val_combined   = (1 - alpha) * (total_student_ce.item() / n) + alpha * val_kl
+    return val_kl, val_combined, val_teacher_ce
+    
 def train_single_model(model_idx, seed, device, config, autocast_ctx, token_bytes,
                        wandb_run, ddp, ddp_world_size, checkpoint_dir,
                        teacher_checkpoint_paths=None):
@@ -801,6 +848,8 @@ def train_single_model(model_idx, seed, device, config, autocast_ctx, token_byte
     min_val_loss = float("inf")
     epochs_without_improvement = 0
     smooth_train_loss = 0
+    smooth_train_hard_loss = 0  # EMA for hard CE component
+    smooth_train_kl_loss = 0    # EMA for KL distillation component
     total_training_time = 0
     eval_steps = EVAL_TOKENS // (args.device_batch_size * MAX_SEQ_LEN * ddp_world_size)
 
@@ -819,15 +868,15 @@ def train_single_model(model_idx, seed, device, config, autocast_ctx, token_byte
     while current_epoch <= args.num_epochs:
         synchronize()
         t0 = time.time()
+        train_hard_loss = None
+        train_kl_loss = None
         for micro_step in range(grad_accum_steps):
             if teacher_models:
                 # --- Chain distillation loss ---
-                # Teacher: the single immediately preceding model (no grad)
                 with torch.inference_mode():
                     with autocast_ctx:
                         teacher_logits = teacher_models[0].forward_logits(x).float()
 
-                # Student forward (logits only, so we can compute both losses)
                 with autocast_ctx:
                     student_logits = compiled_model(x)
 
@@ -846,6 +895,8 @@ def train_single_model(model_idx, seed, device, config, autocast_ctx, token_byte
                 ) * (T * T)
 
                 loss = (1 - args.distill_alpha) * hard_loss + args.distill_alpha * kl_loss
+                train_hard_loss = hard_loss.detach()
+                train_kl_loss = kl_loss.detach()
                 del teacher_logits
             else:
                 # --- Standard cross-entropy loss ---
@@ -878,11 +929,23 @@ def train_single_model(model_idx, seed, device, config, autocast_ctx, token_byte
             total_training_time += dt
         if step % 50 == 0 or step == 1:
             print0(f"  [model {model_idx+1}] step {step:05d} ({pct:.2f}%) | loss: {debiased:.6f}")
-        wandb_run.log({
+
+        log_dict = {
             "step": step,
             f"model_{model_idx+1}/train_loss": debiased,
             "model_idx": model_idx,
-        })
+        }
+
+        # Log decomposed distillation train losses when teacher is present
+        if train_hard_loss is not None:
+            smooth_train_hard_loss = ema_beta * smooth_train_hard_loss + (1 - ema_beta) * train_hard_loss.item()
+            smooth_train_kl_loss   = ema_beta * smooth_train_kl_loss   + (1 - ema_beta) * train_kl_loss.item()
+            debiased_hard = smooth_train_hard_loss / (1 - ema_beta**step)
+            debiased_kl   = smooth_train_kl_loss   / (1 - ema_beta**step)
+            log_dict[f"model_{model_idx+1}/train_hard_loss"] = debiased_hard
+            log_dict[f"model_{model_idx+1}/train_kl_loss"]   = debiased_kl
+
+        wandb_run.log(log_dict)
 
         # Epoch sync
         if ddp:
@@ -894,15 +957,41 @@ def train_single_model(model_idx, seed, device, config, autocast_ctx, token_byte
         if epoch != current_epoch:
             compiled_model.eval()
             _val_path = args.input_val_bin if args.input_val_bin else os.path.join(DATA_DIR, "fineweb_val.pt")
+
+            # Standard CE val metrics
             val_loader = DataLoader(_val_path, args.device_batch_size, MAX_SEQ_LEN, device=device, seed=0)
             with autocast_ctx:
                 val_bpb, val_loss = evaluate_bpb(compiled_model, val_loader, eval_steps, token_bytes)
             print0(f"  [model {model_idx+1}] Epoch {current_epoch} | Val BPB: {val_bpb:.6f} | Val Loss: {val_loss:.6f}")
-            wandb_run.log({
+
+            log_dict = {
                 "step": step,
                 f"model_{model_idx+1}/val_bpb": val_bpb,
                 f"model_{model_idx+1}/val_loss": val_loss,
-            })
+            }
+
+            # Distillation val metrics (only when a teacher is present)
+            if teacher_models:
+                val_loader2 = DataLoader(_val_path, args.device_batch_size, MAX_SEQ_LEN, device=device, seed=0)
+                val_kl, val_combined, teacher_val_ce = evaluate_distill_val(
+                    student=compiled_model,
+                    teacher=teacher_models[0],
+                    batches=val_loader2,
+                    steps=eval_steps,
+                    autocast_ctx=autocast_ctx,
+                    alpha=args.distill_alpha,
+                    temperature=args.distill_temperature,
+                    device=device,
+                )
+                print0(f"  [model {model_idx+1}] Epoch {current_epoch} | Val KL: {val_kl:.6f} | Val Combined: {val_combined:.6f} | Teacher Val CE: {teacher_val_ce:.6f}")
+                log_dict.update({
+                    f"model_{model_idx+1}/val_kl": val_kl,
+                    f"model_{model_idx+1}/val_combined": val_combined,
+                    f"model_{model_idx+1}/teacher_val_ce": teacher_val_ce,
+                })
+
+            wandb_run.log(log_dict)
+
             if val_bpb < min_val_bpb:
                 min_val_bpb = val_bpb
                 min_val_loss = val_loss
